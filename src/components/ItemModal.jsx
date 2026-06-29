@@ -4,7 +4,7 @@ import { CATEGORIES, STORES, DEFAULT_STORE, SECTION_MAP, ALDI_SECTIONS } from '.
 
 const CATS = Object.keys(CATEGORIES);
 
-export default function ItemModal({ open, item, onSave, onDelete, onClose }) {
+export default function ItemModal({ open, item, forceNew, onSave, onDelete, onClose }) {
   const [name,  setName]  = useState('');
   const [qty,   setQty]   = useState(1);
   const [unit,  setUnit]  = useState('und');
@@ -12,26 +12,51 @@ export default function ItemModal({ open, item, onSave, onDelete, onClose }) {
   const [store, setStore] = useState(DEFAULT_STORE);
   const [note,  setNote]  = useState('');
 
+  // isEdit is true only when we have a real existing item (has an id) and we are not forcing "new" mode
+  const isEdit = !forceNew && !!item?.id;
+
   useEffect(() => {
-    if (item) { setName(item.name); setQty(item.qty); setUnit(item.unit); setCat(item.cat); setStore(item.store); setNote(item.note ?? ''); }
-    else      { setName(''); setQty(1); setUnit('und'); setCat(CATS[0]); setStore(DEFAULT_STORE); setNote(''); }
+    if (!open) return; // don't reset fields while modal is closed/animating out
+    if (item) {
+      setName(item.name ?? '');
+      setQty(item.qty ?? 1);
+      setUnit(item.unit ?? 'und');
+      setCat(item.cat ?? CATS[0]);
+      setStore(item.store ?? DEFAULT_STORE);
+      setNote(item.note ?? '');
+    } else {
+      setName(''); setQty(1); setUnit('und');
+      setCat(CATS[0]); setStore(DEFAULT_STORE); setNote('');
+    }
   }, [item, open]);
 
   function handleSave() {
-    const n = name.trim(); if (!n) return;
-    onSave({ ...(item ?? {}), name: n, qty: Math.max(0, Number(qty) || 0), unit: unit.trim() || 'und', cat, store, note: note.trim() });
+    const n = name.trim();
+    if (!n) { alert('Escribe un nombre para el producto.'); return; }
+    const payload = {
+      name: n,
+      qty: Math.max(0, Number(qty) || 0),
+      unit: unit.trim() || 'und',
+      cat, store, note: note.trim(),
+    };
+    if (isEdit) payload.id = item.id;
+    onSave(payload);
+  }
+
+  function handleDelete() {
+    if (window.confirm(`¿Eliminar "${item?.name}"?`)) onDelete(item.id);
   }
 
   const secOrder = SECTION_MAP[name];
   const sec = secOrder ? ALDI_SECTIONS.find(s => s.order === secOrder) : null;
 
   return (
-    <Modal open={open} onClose={onClose} title={item ? 'Editar producto' : 'Nuevo producto'}>
+    <Modal open={open} onClose={onClose} title={isEdit ? 'Editar producto' : 'Nuevo producto'}>
       <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* Name */}
         <Field label="Nombre">
-          <input style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del producto" autoFocus={!item} />
+          <input style={inp} value={name} onChange={e => setName(e.target.value)} placeholder="Nombre del producto" autoFocus={!isEdit} />
         </Field>
 
         {sec && (
@@ -78,10 +103,10 @@ export default function ItemModal({ open, item, onSave, onDelete, onClose }) {
 
         {/* Buttons */}
         <button onClick={handleSave} style={{ ...btn, background:'var(--green-bg)', color:'var(--green)', border:'0.5px solid var(--green-bd)' }}>
-          Guardar
+          {isEdit ? 'Guardar cambios' : '+ Agregar producto'}
         </button>
-        {item && (
-          <button onClick={() => { if (window.confirm(`¿Eliminar "${item.name}"?`)) onDelete(item.id); }} style={{ ...btn, color:'var(--red)', border:'0.5px solid var(--red-bd)' }}>
+        {isEdit && (
+          <button onClick={handleDelete} style={{ ...btn, color:'var(--red)', border:'0.5px solid var(--red-bd)' }}>
             🗑 Eliminar producto
           </button>
         )}

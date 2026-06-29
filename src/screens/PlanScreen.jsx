@@ -9,7 +9,9 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
   const [search,      setSearch]      = useState('');
   const [filterCat,   setFilterCat]   = useState('Todas');
   const [filterStore, setFilterStore] = useState('Todas');
-  const [modal,       setModal]       = useState(null); // null=closed, false=new, item obj=edit
+  const [editingItem, setEditingItem] = useState(null);   // existing item being edited
+  const [showAddModal, setShowAddModal] = useState(false); // controls "new product" modal
+  const [prefillName, setPrefillName] = useState('');      // name typed in quick-add bar
   const [newName,     setNewName]     = useState('');
 
   const filtered = useMemo(() => {
@@ -20,7 +22,6 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
     return list.sort((a,b) => a.cat.localeCompare(b.cat) || a.name.localeCompare(b.name));
   }, [items, filterCat, filterStore, search]);
 
-  // Group into sections
   const grouped = useMemo(() => {
     const map = {};
     filtered.forEach(item => {
@@ -31,9 +32,36 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
     return Object.entries(map);
   }, [filtered, filterCat]);
 
-  function handleSave(data) {
-    if (data.id) updateItem(data.id, data); else addItem(data);
-    setModal(null);
+  // ─── Add / Edit handlers ──────────────────────────────────────────────────────
+  function openAddModal() {
+    setPrefillName(newName.trim());
+    setShowAddModal(true);
+  }
+
+  function openEditModal(item) {
+    setEditingItem(item);
+  }
+
+  function closeModals() {
+    setShowAddModal(false);
+    setEditingItem(null);
+    setPrefillName('');
+    setNewName('');
+  }
+
+  function handleSaveNew(data) {
+    addItem(data);          // always goes through addItem for brand-new products
+    closeModals();
+  }
+
+  function handleSaveEdit(data) {
+    updateItem(data.id, data);
+    closeModals();
+  }
+
+  function handleDelete(id) {
+    deleteItem(id);
+    closeModals();
   }
 
   function handleReset() {
@@ -46,11 +74,6 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
     if (r === 'empty')  alert('Agrega cantidades primero.');
     else if (r === 'exists') alert('Esta semana ya está guardada en el historial.');
     else alert('✅ Semana guardada en historial.');
-  }
-
-  function openAdd() {
-    setModal(false);
-    setNewName('');
   }
 
   const activeCount = items.filter(i => i.qty > 0).length;
@@ -119,7 +142,7 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
                     <button onClick={() => changeQty(item.id, +1)} style={{ width:26, height:26, borderRadius:'50%', border:'0.5px solid var(--border2)', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text2)' }}>+</button>
                     <span style={{ fontSize:10, color:'var(--text3)', minWidth:22 }}>{item.unit}</span>
                   </div>
-                  <button onClick={() => setModal(item)} style={{ color:'var(--text3)', fontSize:16, padding:'0 2px' }}>✏️</button>
+                  <button onClick={() => openEditModal(item)} style={{ color:'var(--text3)', fontSize:16, padding:'0 2px' }}>✏️</button>
                 </div>
               );
             })}
@@ -131,12 +154,12 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
       <div style={{ display:'flex', gap:8, padding:'8px 16px', borderTop:'0.5px solid var(--border)', background:'var(--bg)' }}>
         <input
           value={newName} onChange={e => setNewName(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) { setModal({ _new: true, name: newName.trim() }); } }}
+          onKeyDown={e => { if (e.key === 'Enter') openAddModal(); }}
           placeholder="Nuevo producto…"
           style={{ flex:1, padding:'8px 10px', border:'0.5px solid var(--border2)', borderRadius:'var(--radius-md)', fontSize:13, background:'var(--bg2)', color:'var(--text)', outline:'none' }}
         />
         <button
-          onClick={() => { if (newName.trim()) setModal({ _new:true, name: newName.trim() }); else openAdd(); }}
+          onClick={openAddModal}
           style={{ padding:'8px 14px', background:'var(--green-bg)', border:'0.5px solid var(--green-bd)', color:'var(--green)', borderRadius:'var(--radius-md)', fontSize:12, fontWeight:500 }}
         >
           + Agregar
@@ -149,12 +172,23 @@ export default function PlanScreen({ items, changeQty, updateItem, deleteItem, a
         <FtrBtn onClick={handleSaveWeek} label="💾 Guardar semana" />
       </div>
 
+      {/* Edit existing item */}
       <ItemModal
-        open={!!modal}
-        item={modal && modal.id ? modal : modal && modal._new ? { name: modal.name } : null}
-        onSave={handleSave}
-        onDelete={id => { deleteItem(id); setModal(null); }}
-        onClose={() => setModal(null)}
+        open={!!editingItem}
+        item={editingItem}
+        onSave={handleSaveEdit}
+        onDelete={handleDelete}
+        onClose={closeModals}
+      />
+
+      {/* Add new item — always a fresh, blank-or-prefilled form, never depends on a fake "item" object */}
+      <ItemModal
+        open={showAddModal}
+        item={prefillName ? { name: prefillName, qty: 1, unit: 'und', cat: ALL_CATS[1], store: 'Aldi', note: '' } : null}
+        forceNew
+        onSave={handleSaveNew}
+        onDelete={() => {}}
+        onClose={closeModals}
       />
     </div>
   );
