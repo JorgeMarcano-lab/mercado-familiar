@@ -42,14 +42,12 @@ export function useStore() {
       console.error('Sin conexion con la nube, usando copia local:', err);
     });
     return unsub;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const persist = useCallback((patch) => {
     setDoc(docRef, patch, { merge: true }).catch((err) =>
       console.error('No se pudo guardar en la nube (se guardo localmente):', err)
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setItems = useCallback((updater) => {
